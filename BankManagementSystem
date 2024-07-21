@@ -1,0 +1,633 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <stdexcept>
+using namespace std;
+
+class Account
+{
+protected:
+    string accountNumber;
+    string accountHolderName;
+    double balance;
+
+public:
+    Account() {}
+    Account(string ano, string aname, double bal = 0)
+    {
+        accountNumber = ano;
+        accountHolderName = aname;
+        balance = bal;
+    }
+
+    virtual void deposit(double amount)
+    {
+        if (amount <= 0)
+        {
+            throw invalid_argument("Deposit amount must be greater than zero.");
+        }
+
+        balance += amount;
+        cout << "Deposited Rs." << amount << " into account " << accountNumber << endl;
+    }
+
+    virtual void withdraw(double amount)
+    {
+        if (amount <= 0)
+        {
+            throw invalid_argument("Withdrawal amount must be greater than zero.");
+        }
+
+        if (balance >= amount)
+        {
+            balance -= amount;
+            cout << "Withdrawn Rs." << amount << " from account " << accountNumber << endl;
+        }
+        else
+        {
+            throw runtime_error("Insufficient balance in account " + accountNumber);
+        }
+    }
+
+    virtual void display()
+    {
+        cout << "Account Number: " << accountNumber<<"||"<< "Account Holder Name: " << accountHolderName <<"||"<< "Balance: Rs." << balance << endl;
+    }
+
+    string getAccountNumber()
+    {
+        return accountNumber;
+    }
+
+    void saveToFile(ofstream &file)
+    {
+        file << accountNumber << " " << accountHolderName << " " << balance << endl;
+    }
+};
+
+
+class SavingsAccount : public Account
+{
+private:
+    double interestRate;
+    double minimumBalance;
+    int withdrawalLimit;
+
+public:
+    SavingsAccount(string ano, string aname, double intRate, double minBal, int l) : Account(ano, aname)
+    {
+        interestRate=intRate;
+        minimumBalance=minBal;
+        withdrawalLimit=l;
+    }
+
+    void deposit(double amount) override
+    {
+        Account::deposit(amount);
+        calculateInterest();
+    }
+
+    void withdraw(double amount) override
+    {
+        if (balance - amount >= minimumBalance)
+        {
+            Account::withdraw(amount);
+        }
+        else
+        {
+            cout<<"Withdrawal amount exceeds minimum balance requirement"<<endl;
+        }
+    }
+
+    void calculateInterest()
+    {
+        double interest = balance * (interestRate / 100);
+        balance += interest;
+        cout<<"Interest accrued: Rs."<<interest<<endl;
+    }
+
+    void display() override
+    {
+        cout<<"Savings Account Details"<<endl;
+        Account::display();
+    }
+};
+class CheckingAccount : public Account
+{
+private:
+    double overdraftLimit;
+    int monthlyTransactionLimit;
+    int remainingTransactions;
+public:
+    CheckingAccount() {}
+
+    CheckingAccount(string accNumber, string accHolderName, double odlim, int monthlyTransLim) : Account(accNumber, accHolderName)
+    {
+        overdraftLimit = odlim;
+        monthlyTransactionLimit = monthlyTransLim;
+        remainingTransactions = monthlyTransLim;
+    }
+
+    void deposit(double amount) override
+    {
+        Account::deposit(amount);
+    }
+    void withdraw(double amount) override
+    {
+        if (balance + overdraftLimit >= amount)
+        {
+            Account::withdraw(amount);
+        }
+        else
+        {
+            cout<<"Withdrawal amount exceeds overdraft limit"<<endl;
+        }
+    }
+    void display() override
+    {
+        cout<<"Checking Account Details"<<endl;
+        Account::display();
+    }
+};
+class LoanAccount : public Account
+{
+private:
+    double loanAmount;
+    double interestRate;
+    int repaymentPeriod;
+public:
+    LoanAccount() {}
+
+    LoanAccount(string accNumber, string accHolderName, double loanAmt, double intRate, int repayPeriod) : Account(accNumber, accHolderName)
+    {
+        loanAmount = loanAmt;
+        interestRate = intRate;
+        repaymentPeriod = repayPeriod;
+    }
+    void deposit(double amount) override
+    {
+        cout<<"Loan account cannot receive deposits"<<endl;
+    }
+    void withdraw(double amount) override
+    {
+        cout<<"Loan account cannot make withdrawals"<<endl;
+    }
+    void display() override
+    {
+        cout<<"Loan Account Details"<<endl;
+        cout<<"Loan Amount: Rs."<<loanAmount<<endl;
+        cout<<"Account Holder Name: "<<accountHolderName<<endl;
+        cout<<"Account Number: "<<accountNumber<<endl;
+    }
+};
+
+class InvestmentAccount : public Account
+{
+private:
+    string investmentType;
+public:
+    InvestmentAccount() {}
+
+    InvestmentAccount(string accNumber, string accHolderName, string invType):Account(accNumber, accHolderName)
+    {
+        investmentType=invType;
+    }
+    void deposit(double amount) override
+    {
+        Account::deposit(amount);
+    }
+    void withdraw(double amount) override
+    {
+        if (balance >= amount)
+        {
+            Account::withdraw(amount);
+        }
+        else
+        {
+            cout<<"Insufficient balance in investment account"<<endl;
+        }
+    }
+    void display() override
+    {
+        cout<<"Investment Account Details"<<endl;
+        Account::display();
+    }
+};
+class CreditCardAccount : public Account
+{
+private:
+    double creditLimit;
+    double interestRate;
+public:
+    CreditCardAccount() {}
+
+    CreditCardAccount(string accNumber, string accHolderName, double creditLim, double intRate):Account(accNumber, accHolderName)
+    {
+        creditLimit = creditLim;
+        interestRate = intRate;
+    }
+    void deposit(double amount) override
+    {
+        cout<<"Credit card account cannot receive deposits"<<endl;
+    }
+    void withdraw(double amount) override
+    {
+        if (balance + creditLimit >= amount)
+        {
+            balance -= amount;
+            cout<<"Withdrawn Rs."<<amount<<" from credit card account "<<accountNumber<<endl;
+        }
+        else
+        {
+            cout<<"Withdrawal amount exceeds credit limit"<<endl;
+        }
+    }
+    void display() override
+    {
+        cout << "Credit Card Account Details" << endl;
+        Account::display();
+    }
+};
+
+void readAccountsFromFile(vector<Account*>& accounts)
+{
+    ifstream file("ACCOUNTS.dat");
+    if (!file.is_open())
+    {
+        cout<<"File not found. Creating a new file."<<endl;
+        return;
+    }
+
+    string accNumber, accHolderName;
+    double balance;
+    while (file>>accNumber>>accHolderName>>balance)
+    {
+        accounts.push_back(new Account(accNumber, accHolderName, balance));
+    }
+
+    file.close();
+}
+
+void writeAccountsToFile(const vector<Account*>& accounts)
+{
+    ofstream file("ACCOUNTS.dat");
+    if (!file.is_open())
+    {
+        cout<<"Unable to open file for writing."<<endl;
+        return;
+    }
+
+    for (const auto& acc : accounts)
+    {
+        acc->saveToFile(file);
+    }
+
+    file.close();
+}
+bool isAlphaString(const string& str)
+{
+    for (char c : str)
+    {
+        if (!isalpha(c))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+bool isNumericString(const string& str)
+{
+    for (char c : str)
+    {
+        if (!isdigit(c))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+int main()
+{
+    vector<Account*> accounts;
+
+    readAccountsFromFile(accounts);
+
+    while (true)
+    {
+        cout<<"===== Main Menu ====="<<endl;
+        cout<< "1. Create Savings Account"<<endl;
+        cout<< "2. Create Checking Account"<<endl;
+        cout<< "3. Create Loan Account"<<endl;
+        cout<< "4. Create Investment Account"<<endl;
+        cout<< "5. Create Credit Card Account"<<endl;
+        cout<< "6. Deposit Money"<<endl;
+        cout<< "7. Withdraw Money"<<endl;
+        cout<< "8. Display Account Details"<<endl;
+        cout<< "9. Exit"<<endl;
+
+        try
+        {
+            int choice;
+            cout<<"Enter your choice: ";
+            cin>>choice;
+
+            switch (choice)
+            {
+            case 1:
+            {
+                string accNumber, accHolderName;
+                double intRate, minBal;
+                int withLimit;
+
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                while (!isNumericString(accNumber))
+                {
+                    cout << "Invalid account number. Please enter a valid numeric account number: ";
+                    cin >> accNumber;
+                }
+                bool exists = false;
+                for (const auto& acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (exists)
+                {
+                    cout << "Account number already exists. Please enter a different account number." << endl;
+                    break;
+                }
+
+                cout << "Enter account holder name: ";
+                cin >> accHolderName;
+                while (!isAlphaString(accHolderName))
+                {
+                    cout << "Invalid name. Please enter a valid name without numbers: ";
+                    cin >> accHolderName;
+                }
+                cout << "Enter interest rate: ";
+                cin >> intRate;
+                cout << "Enter minimum balance: ";
+                cin >> minBal;
+                cout << "Enter withdrawal limit: ";
+                cin >> withLimit;
+
+                accounts.push_back(new SavingsAccount(accNumber, accHolderName, intRate, minBal, withLimit));
+                break;
+            }
+
+            case 2:
+            {
+                string accNumber;
+                string accHolderName;
+                double overdraftLim;
+                int monthlyTransLim;
+
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                while (!isNumericString(accNumber))
+                {
+                    cout << "Invalid account number. Please enter a valid numeric account number: ";
+                    cin >> accNumber;
+                }
+                bool exists = false;
+                for (const auto& acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (exists)
+                {
+                    cout << "Account number already exists. Please enter a different account number." << endl;
+                    break;
+                }
+
+                cout << "Enter account holder name: ";
+                cin >> accHolderName;
+                while (!isAlphaString(accHolderName))
+                {
+                    cout << "Invalid name. Please enter a valid name without numbers: ";
+                    cin >> accHolderName;
+                }
+                cout << "Enter overdraft limit: ";
+                cin >> overdraftLim;
+                cout << "Enter monthly transaction limit: ";
+                cin >> monthlyTransLim;
+
+                accounts.push_back(new CheckingAccount(accNumber, accHolderName, overdraftLim, monthlyTransLim));
+                break;
+            }
+            case 3:
+            {
+                string accNumber;
+                string accHolderName;
+                double loanAmt, intRate;
+                int repayPeriod;
+
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                while (!isNumericString(accNumber))
+                {
+                    cout << "Invalid account number. Please enter a valid numeric account number: ";
+                    cin >> accNumber;
+                }
+                bool exists = false;
+                for (const auto& acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (exists)
+                {
+                    cout << "Account number already exists. Please enter a different account number." << endl;
+                    break;
+                }
+
+                cout << "Enter account holder name: ";
+                cin >> accHolderName;
+                while (!isAlphaString(accHolderName))
+                {
+                    cout << "Invalid name. Please enter a valid name without numbers: ";
+                    cin >> accHolderName;
+                }
+                cout << "Enter loan amount: ";
+                cin >> loanAmt;
+                cout << "Enter interest rate: ";
+                cin >> intRate;
+                cout << "Enter repayment period (in months): ";
+                cin >> repayPeriod;
+
+                accounts.push_back(new LoanAccount(accNumber, accHolderName, loanAmt, intRate, repayPeriod));
+                break;
+            }
+
+            case 4:
+            {
+                string accNumber;
+                string accHolderName;
+                string invType;
+
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                while (!isNumericString(accNumber))
+                {
+                    cout << "Invalid account number. Please enter a valid numeric account number: ";
+                    cin >> accNumber;
+                }
+                bool exists = false;
+                for (const auto& acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (exists)
+                {
+                    cout << "Account number already exists. Please enter a different account number." << endl;
+                    break;
+                }
+
+                cout << "Enter account holder name: ";
+                cin >> accHolderName;
+                while (!isAlphaString(accHolderName))
+                {
+                    cout << "Invalid name. Please enter a valid name without numbers: ";
+                    cin >> accHolderName;
+                }
+                cout << "Enter investment type: ";
+                cin >> invType;
+
+                accounts.push_back(new InvestmentAccount(accNumber, accHolderName, invType));
+                break;
+            }
+
+            case 5:
+            {
+                string accNumber;
+                string accHolderName;
+                double creditLim;
+                double intRate;
+
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                while (!isNumericString(accNumber))
+                {
+                    cout << "Invalid account number. Please enter a valid numeric account number: ";
+                    cin >> accNumber;
+                }
+                bool exists = false;
+                for (const auto& acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (exists)
+                {
+                    cout << "Account number already exists. Please enter a different account number." << endl;
+                    break;
+                }
+
+                cout << "Enter account holder name: ";
+                cin >> accHolderName;
+                while (!isAlphaString(accHolderName))
+                {
+                    cout << "Invalid name. Please enter a valid name without numbers: ";
+                    cin >> accHolderName;
+                }
+                cout << "Enter credit limit: ";
+                cin >> creditLim;
+                cout << "Enter interest rate: ";
+                cin >> intRate;
+
+                accounts.push_back(new CreditCardAccount(accNumber, accHolderName, creditLim, intRate));
+                break;
+            }
+
+            case 6:
+            {
+                string accNumber;
+                double amount;
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                cout << "Enter deposit amount: ";
+                cin >> amount;
+
+                for (auto &acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        acc->deposit(amount);
+                        break;
+                    }
+                }
+                break;
+            }
+
+            case 7:
+            {
+                string accNumber;
+                double amount;
+                cout << "Enter account number: ";
+                cin >> accNumber;
+                cout << "Enter withdrawal amount: ";
+                cin >> amount;
+
+                for (auto &acc : accounts)
+                {
+                    if (acc->getAccountNumber() == accNumber)
+                    {
+                        acc->withdraw(amount);
+                        break;
+                    }
+                }
+                break;
+            }
+
+            case 8:
+            {
+                for (auto &acc : accounts)
+                {
+                    acc->display();
+                    cout << endl;
+                }
+                break;
+            }
+
+            case 9:
+            {
+                writeAccountsToFile(accounts);
+                cout << "Exiting program." << endl;
+                return 0;
+            }
+            default:
+                cout << "Invalid choice. Please enter a valid option." << endl;
+            }
+        }
+        catch (const exception& e)
+        {
+            cout << "Exception occurred: " << e.what() << endl;
+        }
+    }
+
+    return 0;
+}
